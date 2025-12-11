@@ -1,5 +1,4 @@
-/* Digital Logic Simplifier - Main Stylesheet */
-/* --- Responsive base variables & small-reset (insert right after the * { ... } rule) --- */
+
 :root{
   --container-max: 1400px;
   --container-padding: 20px;
@@ -45,9 +44,7 @@ body {
     padding: 20px;
 }
 
-/* ---------------------------
-   Select / dropdown rescue
-   --------------------------- */
+
 /* Ensure native dropdowns render above other UI and are not clipped */
 select, .output-select {
   position: relative;        /* allow z-index to take effect */
@@ -99,7 +96,7 @@ select, .output-select {
     opacity: 0.9;
 }
 
-/* MAIN CONTENT: give left column more weight on medium+ screens */
+
 .main-content {
     padding: 30px;
     display: grid;
@@ -141,7 +138,7 @@ select, .output-select {
     border: 1px solid #e0e0e0;
     transition: transform 0.25s ease, box-shadow 0.25s ease;
     will-change: transform;    /* hint but does not create stacking context */
-    /* IMPORTANT: do NOT set overflow: hidden here — allows dropdowns to show */
+    
     overflow: visible;
     min-width: 0;              /* lets grid/flex children shrink safely */
 }
@@ -222,7 +219,7 @@ button:active {
 }
 
 /* Table Styles */
-/* TABLES: keep full-width on desktop, allow horizontal scroll on small screens */
+
 .truth-table, .kmap-table {
     width: 100%;
     border-collapse: collapse;
@@ -274,8 +271,6 @@ button:active {
     transition: all 0.2s ease;
 }
 
-/* K-Map Styles */
-/* K-MAP CELLS — fluid, responsive sizing */
 .kmap-cell {
     width: clamp(40px, 8vw, 60px);
     height: clamp(40px, 8vw, 60px);
@@ -284,9 +279,10 @@ button:active {
     transition: all 0.3s ease;
     font-weight: bold;
     font-size: clamp(14px, 2vw, 18px);
-    display: flex;
+    vertical-align: middle;
+    /* display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: center; */
     min-width: 40px;
     min-height: 40px;
 }
@@ -762,7 +758,6 @@ button:active {
     }
 }
 
-/* ... existing styles ... */
 
 /* Logic Circuit Diagram Styles */
 .circuit-container {
@@ -787,7 +782,7 @@ svg.logic-circuit {
     max-width: calc(100vw - (var(--container-padding, 20px) * 2));
 }
 
-/* Safety: treat internal SVG drawing coordinates as box content (prevents accidental overflow) */
+
 svg.logic-circuit * {
     vector-effect: non-scaling-stroke; /* optional but helps stroke scaling */
     box-sizing: border-box;
@@ -934,7 +929,7 @@ svg.logic-circuit * {
 /* keep long code lines safe but allow horizontal scroll */
 .code-block { white-space: pre; overflow-x: auto; min-width: 0; }
 
-/* ---------- Responsive compact selects (override earlier rules) ---------- */
+
 select, .output-select {
   width: 100%;
   max-width: 160px;                    /* prevents huge selects on wide screens */
@@ -954,15 +949,15 @@ select, .output-select {
   overflow: hidden;                     /* prefer internal clipping rather than huge popup */
 }
 
-/* Some browsers will honor option styling — include safe defaults */
+
 select option, .output-select option {
   font-size: inherit;
   line-height: 1.3;
   padding: 4px 8px;
   color: #000 !important;
   background: #fff !important;
-  white-space: nowrap;                  /* prefer single-line options where possible */
-  max-width: 100vw;                     /* best-effort: option list won't exceed viewport */
+  white-space: nowrap;                
+  max-width: 100vw;                     
 }
 
 /* Make select smaller on very small screens */
@@ -976,7 +971,7 @@ select option, .output-select option {
 
 /* Ensure controls don't force overflow */
 .controls select, .controls .output-select {
-  min-width: 0; /* lets flex children shrink properly */
+  min-width: 0; 
 }
 
 /* In dark-mode switch text/background for selects */

@@ -1,7 +1,4 @@
-/**
- * Digital Logic Simplifier & Verilog Generator
- * Main JavaScript Logic
- */
+
 
 // Global variables
 let variables = ['A', 'B', 'C'];
@@ -16,9 +13,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('var-count').addEventListener('change', generateTruthTable);
 });
 
-/**
- * Generate truth table based on number of variables
- */
+
 function generateTruthTable() {
     const varCount = parseInt(document.getElementById('var-count').value);
     
@@ -72,9 +67,7 @@ function generateTruthTable() {
     updateAll();
 }
 
-/**
- * Update output value for specific row
- */
+
 function updateOutput(rowIndex, value) {
     if (rowIndex >= 0 && rowIndex < truthTable.length) {
         truthTable[rowIndex][variables.length] = value;
@@ -82,9 +75,7 @@ function updateOutput(rowIndex, value) {
     }
 }
 
-/**
- * Clear all output values to 0
- */
+
 function clearTable() {
     truthTable.forEach((row, i) => {
         row[variables.length] = '0';
@@ -97,9 +88,7 @@ function clearTable() {
     showStatus('Table cleared!');
 }
 
-/**
- * Fill table with random values
- */
+
 function randomFill() {
     truthTable.forEach((row, i) => {
         // 60% chance of 1, 30% chance of 0, 10% chance of X
@@ -123,9 +112,7 @@ function randomFill() {
     showStatus('Random values generated!');
 }
 
-/**
- * Update all dependent sections when truth table changes
- */
+
 function updateAll() {
     try {
         generateKMap();
@@ -138,9 +125,7 @@ function updateAll() {
     }
 }
 
-/**
- * Generate K-Map visualization
- */
+
 function generateKMap() {
     const varCount = variables.length;
     let html = '';
@@ -170,9 +155,7 @@ function generateKMap() {
     document.getElementById('kmap-container').innerHTML = '<div class="table-responsive">' + html + '</div>';
 }
 
-/**
- * Generate 2x2 K-Map (2 variables)
- */
+
 function generateKMap2x2() {
     const grayCode = ['0', '1'];
     let html = '<table class="kmap-table"><thead><tr><th>\\</th>';
@@ -197,9 +180,7 @@ function generateKMap2x2() {
     return html;
 }
 
-/**
- * Generate 2x4 K-Map (3 variables)
- */
+
 function generateKMap2x4() {
     const grayCode2 = ['00', '01', '11', '10'];
     let html = '<table class="kmap-table"><thead><tr><th>\\</th>';
@@ -225,9 +206,7 @@ function generateKMap2x4() {
     return html;
 }
 
-/**
- * Generate 4x4 K-Map (4 variables)
- */
+
 function generateKMap4x4() {
     const grayCode2 = ['00', '01', '11', '10'];
     let html = '<table class="kmap-table"><thead><tr><th>\\</th>';
@@ -254,9 +233,7 @@ function generateKMap4x4() {
     return html;
 }
 
-/**
- * Generate display for 5 variables (simplified)
- */
+
 function generateKMap5Var() {
     const minterms = [];
     const dontCares = [];
@@ -278,9 +255,7 @@ function generateKMap5Var() {
     return html;
 }
 
-/**
- * Get CSS class for K-Map cell based on value
- */
+
 function getCellClass(value) {
     switch (value) {
         case '1': return 'one';
@@ -289,9 +264,7 @@ function getCellClass(value) {
     }
 }
 
-/**
- * Convert Gray code to binary
- */
+
 function grayToBinary(gray) {
     const grayMap = {
         '00': 0, '01': 1, '11': 3, '10': 2,
@@ -300,9 +273,7 @@ function grayToBinary(gray) {
     return grayMap[gray] || 0;
 }
 
-/**
- * Generate simplified Boolean expression
- */
+
 function generateSimplifiedExpression() {
     try {
         const minterms = [];
@@ -356,9 +327,7 @@ function generateSimplifiedExpression() {
     }
 }
 
-/**
- * Update expression display elements
- */
+
 function updateExpressionDisplay(raw, latex) {
     document.getElementById('raw-expression').textContent = raw;
     document.getElementById('latex-expression').innerHTML = latex;
@@ -370,10 +339,7 @@ function updateExpressionDisplay(raw, latex) {
     }
 }
 
-/**
- * Quine-McCluskey algorithm for Boolean minimization
- * Updated to include Prime Implicant Chart Coverage (EPI + Greedy)
- */
+
 function quineMcCluskey(minterms, dontCares, numVars) {
     if (minterms.length === 0) return [];
     
@@ -449,11 +415,10 @@ function quineMcCluskey(minterms, dontCares, numVars) {
         iteration++;
     }
 
-    // 2. Optimization Phase: Select Minimum Set of PIs
-    // We pass the raw PI objects and the required minterms (excluding don't cares)
+
     const finalPIs = selectMinimumPrimeImplicants(primeImplicants, minterms);
 
-    // 3. Formatting Phase
+    
     const expressions = finalPIs.map(pi => 
         binaryToExpression(pi.binary, variables)
     );
@@ -461,19 +426,13 @@ function quineMcCluskey(minterms, dontCares, numVars) {
     return expressions.filter(expr => expr.length > 0);
 }
 
-/**
- * Selects the Essential Prime Implicants and uses a greedy approach
- * to cover remaining minterms.
- * @param {Array} pis - All generated Prime Implicants
- * @param {Array} requiredMinterms - Original minterms that MUST be covered (no don't cares)
- */
+
 function selectMinimumPrimeImplicants(pis, requiredMinterms) {
     let finalSelection = [];
     let remainingMinterms = [...requiredMinterms];
     let availablePIs = [...pis];
 
-    // --- STEP 1: Find Essential Prime Implicants (EPIs) ---
-    // An EPI is the only PI that covers a specific minterm.
+
     
     let foundEPI = true;
     while (foundEPI && remainingMinterms.length > 0) {
@@ -519,9 +478,7 @@ function selectMinimumPrimeImplicants(pis, requiredMinterms) {
         }
     }
 
-    // --- STEP 2: Greedy Coverage for Remaining Minterms ---
-    // If minterms remain, pick the PI that covers the MOST remaining minterms.
-    // Tie-breaker: Pick the PI with fewest literals (more '-' dashes).
+
 
     while (remainingMinterms.length > 0) {
         let bestPI = null;
@@ -535,8 +492,7 @@ function selectMinimumPrimeImplicants(pis, requiredMinterms) {
                 maxCoverCount = coverCount;
                 bestPI = pi;
             } else if (coverCount === maxCoverCount) {
-                // Tie-breaker: Choose PI with fewer literals (simplest hardware)
-                // Fewer literals = more dashes ('-') in binary string
+
                 const bestDashes = (bestPI.binary.match(/-/g) || []).length;
                 const currentDashes = (pi.binary.match(/-/g) || []).length;
                 
@@ -561,16 +517,11 @@ function selectMinimumPrimeImplicants(pis, requiredMinterms) {
 
     return finalSelection;
 }
-/**
- * Count number of 1s in binary string
- */
+
 function countOnes(binary) {
     return binary.split('1').length - 1;
 }
 
-/**
- * Find single bit difference between two binary strings
- */
 function findSingleBitDifference(a, b) {
     let differences = 0;
     let position = -1;
@@ -597,9 +548,7 @@ function findSingleBitDifference(a, b) {
     };
 }
 
-/**
- * Convert binary representation to Boolean expression
- */
+
 function binaryToExpression(binary, vars) {
     const terms = [];
     
@@ -609,16 +558,13 @@ function binaryToExpression(binary, vars) {
         } else if (binary[i] === '0') {
             terms.push(vars[i] + "'");
         }
-        // Skip '-' (don't care positions)
+        
     }
     
     return terms.length > 0 ? terms.join('') : '';
 }
 
-/**
- * Generate Verilog module code (Optimized)
- * Uses the simplified expression instead of raw minterms
- */
+
 function generateVerilogCode() {
     try {
         const minterms = [];
@@ -644,14 +590,13 @@ function generateVerilogCode() {
             expression = "1'b1";
             comments.push("    // Function always outputs 1");
         } else {
-            // GET SIMPLIFIED TERMS
-            // We reuse the robust logic you just added
+
             const simplifiedTerms = quineMcCluskey(minterms, dontCares, variables.length);
             
             if (simplifiedTerms.length === 0) {
-                 expression = "1'b0"; // Should have been caught above, but safety first
+                 expression = "1'b0"; 
             } else {
-                // Convert simplified text terms (e.g., "A'B") into Verilog format (e.g., "(~A & B)")
+                
                 const verilogTerms = simplifiedTerms.map(term => {
                     let vTerm = "";
                     for (let i = 0; i < term.length; i++) {
@@ -665,8 +610,7 @@ function generateVerilogCode() {
                             } else {
                                 vTerm += char;
                             }
-                            // Add AND operator if not the last item in this term
-                            // (We check if there are more variables coming in this string)
+
                             if (i < term.length - 1) {
                                 vTerm += " & ";
                             }
@@ -712,9 +656,7 @@ function generateVerilogCode() {
         document.getElementById('verilog-code').textContent = '// Error generating Verilog code';
     }
 }
-/**
- * Generate Verilog testbench code
- */
+
 function generateTestbench() {
     try {
         const n = variables.length;
@@ -818,9 +760,7 @@ function generateTestbench() {
     }
 }
 
-/**
- * Copy content to clipboard
- */
+
 async function copyToClipboard(elementId) {
     try {
         const element = document.getElementById(elementId);
@@ -849,17 +789,15 @@ async function copyToClipboard(elementId) {
             }
         }
         
-        showStatus('📋 Copied to clipboard!');
+        showStatus('Copied to clipboard!');
         
     } catch (error) {
         console.error('Copy to clipboard failed:', error);
-        showStatus('❌ Failed to copy to clipboard', 'error');
+        showStatus('Failed to copy to clipboard', 'error');
     }
 }
 
-/**
- * Download file with given content
- */
+
 function downloadFile(filename, elementId) {
     try {
         const element = document.getElementById(elementId);
@@ -885,17 +823,14 @@ function downloadFile(filename, elementId) {
             window.URL.revokeObjectURL(url);
         }, 100);
         
-        showStatus(`⬇️ Downloaded ${filename}!`);
+        showStatus(`Downloaded ${filename}!`);
         
     } catch (error) {
         console.error('Download failed:', error);
-        showStatus('❌ Download failed', 'error');
+        showStatus(' Download failed', 'error');
     }
 }
 
-/**
- * Show status message to user
- */
 function showStatus(message, type = 'success') {
     const statusEl = document.getElementById('status-message');
     
@@ -918,9 +853,7 @@ function showStatus(message, type = 'success') {
     }, 3000);
 }
 
-/**
- * Utility function to validate truth table
- */
+
 function validateTruthTable() {
     if (!truthTable || truthTable.length === 0) {
         throw new Error('Truth table is empty');
@@ -946,9 +879,7 @@ function validateTruthTable() {
     return true;
 }
 
-/**
- * Export truth table as JSON
- */
+
 function exportTruthTable() {
     try {
         validateTruthTable();
@@ -975,7 +906,7 @@ function exportTruthTable() {
         
     } catch (error) {
         console.error('Export failed:', error);
-        showStatus('❌ Export failed', 'error');
+        showStatus('Export failed', 'error');
     }
 }
 
@@ -1017,10 +948,7 @@ const performance = {
     }
 };
 
-/**
- * Logic Circuit Diagram Generator
- * Renders Standard SOP Schematic using SVG
- */
+
 function drawLogicDiagram(terms) {
     const container = document.getElementById('circuit-container');
     
@@ -1134,11 +1062,7 @@ function drawLogicDiagram(terms) {
 
         // Draw AND Gate Shape
         if (literals.length === 1) {
-            // Special case: Single literal term is just a wire buffer (logic-wise), 
-            // but for visualization consistency we draw a buffer or wire.
-            // If it's a single literal like "A", standard SOP drawing typically just passes it to OR.
-            // But we will draw a buffer-like box or pass-through to keep grid consistent.
-            // Actually, "A" in SOP is A AND 1, so an AND gate with 1 input is valid visually as a buffer.
+ 
             svg += drawAndShape(gateX, gateY, config.gateWidth, config.gateHeight);
         } else {
             svg += drawAndShape(gateX, gateY, config.gateWidth, config.gateHeight);
@@ -1157,8 +1081,7 @@ function drawLogicDiagram(terms) {
 
         // Draw connections from AND outputs to OR inputs
         andGateOutputCoords.forEach((coord, i) => {
-            // Calculate target Y on OR gate curve
-            // We'll distribute them evenly on the back of the OR gate
+
             const inputOffset = (config.gateHeight / (andGateOutputCoords.length + 1)) * (i + 1);
             const targetY = orGateY + inputOffset;
             const targetX = orGateX + 5; // Curve inset
@@ -1185,7 +1108,7 @@ function drawLogicDiagram(terms) {
     container.innerHTML = svg;
 }
 
-// --- Helper Functions for Shapes ---
+
 
 function drawAndShape(x, y, w, h) {
     // Standard D shape
@@ -1193,8 +1116,7 @@ function drawAndShape(x, y, w, h) {
 }
 
 function drawOrShape(x, y, w, h) {
-    // Curved back, pointed front
-    // Using Quadratic Bezier curves
+
     return `<path d="M ${x},${y} 
             Q ${x + w/2},${y} ${x + w},${y + h/2} 
             Q ${x + w/2},${y + h} ${x},${y + h} 
