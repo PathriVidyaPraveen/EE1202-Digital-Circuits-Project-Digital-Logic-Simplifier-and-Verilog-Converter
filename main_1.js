@@ -320,11 +320,13 @@ function generateSimplifiedExpression() {
         // Handle special cases
         if (minterms.length === 0 && dontCares.length === 0) {
             updateExpressionDisplay('F = 0', 'F = 0');
+            drawLogicDiagram([]); // Draw Logic 0
             return;
         }
 
         if (minterms.length === truthTable.length) {
             updateExpressionDisplay('F = 1', 'F = 1');
+            drawLogicDiagram(['1']); // Draw Logic 1
             return;
         }
 
@@ -346,6 +348,7 @@ function generateSimplifiedExpression() {
         }
 
         updateExpressionDisplay(rawExpression, latexExpression);
+        drawLogicDiagram(simplified);
         
     } catch (error) {
         console.error('Expression generation error:', error);
@@ -369,38 +372,34 @@ function updateExpressionDisplay(raw, latex) {
 
 /**
  * Quine-McCluskey algorithm for Boolean minimization
+ * Updated to include Prime Implicant Chart Coverage (EPI + Greedy)
  */
 function quineMcCluskey(minterms, dontCares, numVars) {
     if (minterms.length === 0) return [];
     
+    // 1. Generate Prime Implicants (Existing Logic)
     const allTerms = [...minterms, ...dontCares];
     let terms = allTerms.map(m => ({
         binary: m.toString(2).padStart(numVars, '0'),
-        minterm: m,
-        used: false,
-        essential: false
+        minterms: [m], // Track which minterms this covers
+        used: false
     }));
 
-    // Group terms by number of 1s (Hamming weight)
     let groups = [];
     for (let i = 0; i <= numVars; i++) {
-        groups[i] = terms.filter(term => 
-            countOnes(term.binary) === i
-        );
+        groups[i] = terms.filter(term => countOnes(term.binary) === i);
     }
 
     const primeImplicants = [];
     let iteration = 0;
-    const maxIterations = numVars + 1; // Prevent infinite loops
+    const maxIterations = numVars + 1;
 
-    // Iteratively combine terms
     while (iteration < maxIterations) {
         let combined = false;
         const newGroups = [];
         
         for (let i = 0; i < groups.length - 1; i++) {
             newGroups[i] = [];
-            
             for (let j = 0; j < groups[i].length; j++) {
                 for (let k = 0; k < groups[i + 1].length; k++) {
                     const diff = findSingleBitDifference(groups[i][j].binary, groups[i + 1][k].binary);
@@ -409,12 +408,15 @@ function quineMcCluskey(minterms, dontCares, numVars) {
                         const newBinary = groups[i][j].binary.substring(0, diff.position) + 
                                         '-' + groups[i][j].binary.substring(diff.position + 1);
                         
-                        // Check if this combination already exists
+                        // Prevent duplicates in the next stage
                         if (!newGroups[i].some(t => t.binary === newBinary)) {
                             newGroups[i].push({
                                 binary: newBinary,
-                                minterms: [...(groups[i][j].minterms || [groups[i][j].minterm]),
-                                          ...(groups[i + 1][k].minterms || [groups[i + 1][k].minterm])],
+                                // Merge covered minterms lists
+                                minterms: [...new Set([
+                                    ...groups[i][j].minterms, 
+                                    ...groups[i + 1][k].minterms
+                                ])],
                                 used: false
                             });
                         }
@@ -427,35 +429,138 @@ function quineMcCluskey(minterms, dontCares, numVars) {
             }
         }
         
-        // Add unused terms to prime implicants
+        // Collect unused terms as Prime Implicants
         for (let i = 0; i < groups.length; i++) {
             groups[i].forEach(term => {
                 if (!term.used) {
-                    const termMinterms = term.minterms || [term.minterm];
-                    // Only add if it covers at least one original minterm (not just don't cares)
-                    if (termMinterms.some(m => minterms.includes(m))) {
-                        primeImplicants.push(term);
+                    // Only add if it covers at least one original minterm (not solely don't cares)
+                    if (term.minterms.some(m => minterms.includes(m))) {
+                        // Check for duplicates before pushing
+                        if (!primeImplicants.some(pi => pi.binary === term.binary)) {
+                            primeImplicants.push(term);
+                        }
                     }
                 }
             });
         }
         
         if (!combined) break;
-        
-        // Update groups for next iteration
         groups = newGroups.filter(g => g && g.length > 0);
         iteration++;
     }
 
-    // Convert prime implicants to readable Boolean expressions
-    const expressions = primeImplicants.map(pi => 
+    // 2. Optimization Phase: Select Minimum Set of PIs
+    // We pass the raw PI objects and the required minterms (excluding don't cares)
+    const finalPIs = selectMinimumPrimeImplicants(primeImplicants, minterms);
+
+    // 3. Formatting Phase
+    const expressions = finalPIs.map(pi => 
         binaryToExpression(pi.binary, variables)
     );
 
-    // Remove duplicates and empty expressions
-    return [...new Set(expressions)].filter(expr => expr.length > 0);
+    return expressions.filter(expr => expr.length > 0);
 }
 
+/**
+ * Selects the Essential Prime Implicants and uses a greedy approach
+ * to cover remaining minterms.
+ * @param {Array} pis - All generated Prime Implicants
+ * @param {Array} requiredMinterms - Original minterms that MUST be covered (no don't cares)
+ */
+function selectMinimumPrimeImplicants(pis, requiredMinterms) {
+    let finalSelection = [];
+    let remainingMinterms = [...requiredMinterms];
+    let availablePIs = [...pis];
+
+    // --- STEP 1: Find Essential Prime Implicants (EPIs) ---
+    // An EPI is the only PI that covers a specific minterm.
+    
+    let foundEPI = true;
+    while (foundEPI && remainingMinterms.length > 0) {
+        foundEPI = false;
+        const mintermCounts = {};
+
+        // Count how many PIs cover each remaining minterm
+        remainingMinterms.forEach(m => mintermCounts[m] = 0);
+        
+        availablePIs.forEach(pi => {
+            pi.minterms.forEach(m => {
+                if (remainingMinterms.includes(m)) {
+                    mintermCounts[m]++;
+                }
+            });
+        });
+
+        // Check for minterms covered by exactly 1 PI
+        const essentialMinterms = remainingMinterms.filter(m => mintermCounts[m] === 1);
+        
+        const newlySelectedPIs = [];
+
+        essentialMinterms.forEach(em => {
+            // Find the PI responsible
+            const epi = availablePIs.find(pi => pi.minterms.includes(em));
+            if (epi && !newlySelectedPIs.includes(epi) && !finalSelection.includes(epi)) {
+                newlySelectedPIs.push(epi);
+            }
+        });
+
+        if (newlySelectedPIs.length > 0) {
+            foundEPI = true;
+            // Add EPIs to final selection
+            finalSelection.push(...newlySelectedPIs);
+            
+            // Remove covered minterms
+            newlySelectedPIs.forEach(pi => {
+                remainingMinterms = remainingMinterms.filter(m => !pi.minterms.includes(m));
+            });
+
+            // Remove used PIs from available list
+            availablePIs = availablePIs.filter(pi => !newlySelectedPIs.includes(pi));
+        }
+    }
+
+    // --- STEP 2: Greedy Coverage for Remaining Minterms ---
+    // If minterms remain, pick the PI that covers the MOST remaining minterms.
+    // Tie-breaker: Pick the PI with fewest literals (more '-' dashes).
+
+    while (remainingMinterms.length > 0) {
+        let bestPI = null;
+        let maxCoverCount = -1;
+
+        availablePIs.forEach(pi => {
+            // Calculate how many *remaining* minterms this PI covers
+            const coverCount = pi.minterms.filter(m => remainingMinterms.includes(m)).length;
+            
+            if (coverCount > maxCoverCount) {
+                maxCoverCount = coverCount;
+                bestPI = pi;
+            } else if (coverCount === maxCoverCount) {
+                // Tie-breaker: Choose PI with fewer literals (simplest hardware)
+                // Fewer literals = more dashes ('-') in binary string
+                const bestDashes = (bestPI.binary.match(/-/g) || []).length;
+                const currentDashes = (pi.binary.match(/-/g) || []).length;
+                
+                if (currentDashes > bestDashes) {
+                    bestPI = pi;
+                }
+            }
+        });
+
+        if (bestPI && maxCoverCount > 0) {
+            finalSelection.push(bestPI);
+            // Remove newly covered minterms
+            remainingMinterms = remainingMinterms.filter(m => !bestPI.minterms.includes(m));
+            // Remove used PI
+            availablePIs = availablePIs.filter(pi => pi !== bestPI);
+        } else {
+            // Should not happen if logic is correct and minterms exist
+            console.warn("Could not cover remaining minterms:", remainingMinterms);
+            break; 
+        }
+    }
+
+    return finalSelection;
+}
 /**
  * Count number of 1s in binary string
  */
@@ -511,115 +616,102 @@ function binaryToExpression(binary, vars) {
 }
 
 /**
- * Generate Verilog module code
+ * Generate Verilog module code (Optimized)
+ * Uses the simplified expression instead of raw minterms
  */
 function generateVerilogCode() {
     try {
         const minterms = [];
+        const dontCares = [];
+        
+        // Extract minterms and dont cares again for the simplifier
         truthTable.forEach((row, index) => {
             if (row[variables.length] === '1') {
                 minterms.push(index);
+            } else if (row[variables.length] === 'X') {
+                dontCares.push(index);
             }
         });
 
         let expression;
         let comments = [];
         
-        // Generate expression based on minterms
-        if (minterms.length === 0) {
+        // Handle Trivial Cases
+        if (minterms.length === 0 && dontCares.length === 0) {
             expression = "1'b0";
             comments.push("    // Function always outputs 0");
         } else if (minterms.length === truthTable.length) {
             expression = "1'b1";
             comments.push("    // Function always outputs 1");
         } else {
-            // Generate sum of products expression
-            const terms = minterms.map(m => {
-                const binary = m.toString(2).padStart(variables.length, '0');
-                const termParts = [];
-                
-                for (let i = 0; i < binary.length; i++) {
-                    if (binary[i] === '1') {
-                        termParts.push(variables[i]);
-                    } else {
-                        termParts.push('~' + variables[i]);
-                    }
-                }
-                
-                return termParts.length > 1 ? '(' + termParts.join(' & ') + ')' : termParts[0];
-            });
+            // GET SIMPLIFIED TERMS
+            // We reuse the robust logic you just added
+            const simplifiedTerms = quineMcCluskey(minterms, dontCares, variables.length);
             
-            if (terms.length > 1) {
-                expression = terms.join(' |\n                 ');
+            if (simplifiedTerms.length === 0) {
+                 expression = "1'b0"; // Should have been caught above, but safety first
             } else {
-                expression = terms[0];
+                // Convert simplified text terms (e.g., "A'B") into Verilog format (e.g., "(~A & B)")
+                const verilogTerms = simplifiedTerms.map(term => {
+                    let vTerm = "";
+                    for (let i = 0; i < term.length; i++) {
+                        const char = term[i];
+                        // If it's a variable
+                        if (variables.includes(char)) {
+                            // Check if next char is ' (prime)
+                            if (i + 1 < term.length && term[i+1] === "'") {
+                                vTerm += `~${char}`;
+                                i++; // Skip the '
+                            } else {
+                                vTerm += char;
+                            }
+                            // Add AND operator if not the last item in this term
+                            // (We check if there are more variables coming in this string)
+                            if (i < term.length - 1) {
+                                vTerm += " & ";
+                            }
+                        }
+                    }
+                    // Clean up trailing " & " if logic above left one
+                    if (vTerm.endsWith(" & ")) vTerm = vTerm.slice(0, -3);
+                    
+                    return simplifiedTerms.length > 1 ? `(${vTerm})` : vTerm;
+                });
+                
+                expression = verilogTerms.join(' | ');
+                comments.push(`    // Optimized Logic Expression`);
             }
-            
-            comments.push(`    // Sum of Products with ${minterms.length} minterms`);
-            comments.push(`    // Minterms: ${minterms.join(', ')}`);
         }
 
-        // Build the module code as an array for better control
+        // Build the module code
         const codeLines = [];
         
-        // Header comment
         codeLines.push("/*");
         codeLines.push(" * Digital Logic Circuit Module");
         codeLines.push(" * Generated by Digital Logic Simplifier");
-        codeLines.push(" * ");
         codeLines.push(` * Variables: ${variables.join(', ')}`);
-        codeLines.push(` * Function: F(${variables.join(', ')})`);
         codeLines.push(" */");
         codeLines.push("");
-        
-        // Module declaration
         codeLines.push("module circuit(");
-        variables.forEach((v, index) => {
-            if (index < variables.length - 1) {
-                codeLines.push(`    input ${v},`);
-            } else {
-                codeLines.push(`    input ${v},`);
-            }
+        variables.forEach((v) => {
+             codeLines.push(`    input ${v},`);
         });
         codeLines.push("    output F");
         codeLines.push(");");
         codeLines.push("");
         
-        // Add comments and logic
-        comments.forEach(comment => {
-            codeLines.push(comment);
-        });
+        comments.forEach(c => codeLines.push(c));
         codeLines.push(`    assign F = ${expression};`);
         codeLines.push("");
         codeLines.push("endmodule");
-        codeLines.push("");
-        
-        // Add usage example
-        codeLines.push("/*");
-        codeLines.push(" * Usage Example:");
-        codeLines.push(" * ");
-        codeLines.push(" * circuit my_logic_circuit(");
-        variables.forEach((v, index) => {
-            if (index < variables.length - 1) {
-                codeLines.push(`    .${v}(input_${v.toLowerCase()}),`);
-            } else {
-                codeLines.push(`    .${v}(input_${v.toLowerCase()}),`);
-            }
-        });
-        codeLines.push("    .F(output_signal)");
-        codeLines.push(" );");
-        codeLines.push(" */");
 
-        // Join all lines with newlines
-        const verilogCode = codeLines.join('\n');
-        document.getElementById('verilog-code').textContent = verilogCode;
+        document.getElementById('verilog-code').textContent = codeLines.join('\n');
         
     } catch (error) {
         console.error('Verilog generation error:', error);
-        document.getElementById('verilog-code').textContent = '// Error generating Verilog code\n// Please check your truth table';
+        document.getElementById('verilog-code').textContent = '// Error generating Verilog code';
     }
 }
-
 /**
  * Generate Verilog testbench code
  */
@@ -924,5 +1016,190 @@ const performance = {
         this.start = now;
     }
 };
+
+/**
+ * Logic Circuit Diagram Generator
+ * Renders Standard SOP Schematic using SVG
+ */
+function drawLogicDiagram(terms) {
+    const container = document.getElementById('circuit-container');
+    
+    // Handle trivial cases
+    if (!terms || terms.length === 0 || (terms.length === 1 && terms[0] === '0')) {
+        container.innerHTML = '<div style="text-align:center; padding:20px; font-weight:bold; color:#555;">Output is always Logic 0 (Ground)</div>';
+        return;
+    }
+    if (terms.length === 1 && terms[0] === '1') {
+        container.innerHTML = '<div style="text-align:center; padding:20px; font-weight:bold; color:#555;">Output is always Logic 1 (VCC)</div>';
+        return;
+    }
+
+    // Configuration
+    const config = {
+        gridX: 40,      // Horizontal spacing
+        gridY: 60,      // Vertical spacing per term
+        railSpacing: 30,
+        gateWidth: 60,
+        gateHeight: 40,
+        notSize: 15,
+        padding: 40
+    };
+
+    // Parse terms into structured data
+    const parsedTerms = terms.map(term => {
+        const literals = [];
+        for (let i = 0; i < variables.length; i++) {
+            const char = variables[i];
+            if (term.includes(char)) {
+                // Check if inverted (next char is ')
+                const idx = term.indexOf(char);
+                const inverted = term[idx + 1] === "'";
+                literals.push({ varIndex: i, inverted });
+            }
+        }
+        return literals;
+    });
+
+    // Calculate Dimensions
+    const numInputs = variables.length;
+    const numAndGates = parsedTerms.length;
+    const railsWidth = numInputs * config.railSpacing;
+    const wiresLength = 40;
+    
+    // SVG Dimensions
+    const width = railsWidth + wiresLength + config.gateWidth + 80 + (numAndGates > 1 ? config.gateWidth : 0) + config.padding * 2;
+    const height = Math.max(numAndGates * config.gridY, numInputs * 50) + config.padding * 2;
+    
+    // Create SVG
+    let svg = `<svg class="logic-circuit" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">`;
+    
+    // Define Arrow Marker for lines
+    svg += `<defs>
+        <marker id="dot" markerWidth="6" markerHeight="6" refX="3" refY="3">
+            <circle cx="3" cy="3" r="2.5" fill="#333" />
+        </marker>
+    </defs>`;
+
+    const startX = config.padding;
+    const startY = config.padding;
+
+    // 1. Draw Vertical Input Rails
+    variables.forEach((v, i) => {
+        const x = startX + i * config.railSpacing;
+        // Label
+        svg += `<text x="${x}" y="${startY - 15}" class="circuit-text">${v}</text>`;
+        // Rail line
+        svg += `<line x1="${x}" y1="${startY}" x2="${x}" y2="${height - config.padding}" class="circuit-wire" style="stroke: #999; stroke-width: 1.5;" />`;
+    });
+
+    // 2. Draw AND Gates (Product Terms)
+    const andGateOutputX = startX + railsWidth + wiresLength + config.gateWidth;
+    const andGateOutputCoords = [];
+
+    parsedTerms.forEach((literals, index) => {
+        // Center the gate in its vertical slot
+        const gateY = startY + index * config.gridY + (config.gridY - config.gateHeight) / 2;
+        const gateX = startX + railsWidth + wiresLength;
+        const gateCenterY = gateY + config.gateHeight / 2;
+
+        // Draw Input Connections
+        literals.forEach((lit, litIndex) => {
+            const railX = startX + lit.varIndex * config.railSpacing;
+            // Distribute inputs on the gate face
+            const inputOffset = (config.gateHeight / (literals.length + 1)) * (litIndex + 1);
+            const connectionY = gateY + inputOffset;
+
+            // Horizontal wire from rail to gate
+            let endWireX = gateX;
+            
+            // Draw connection dot on rail
+            svg += `<circle cx="${railX}" cy="${connectionY}" r="3" class="circuit-dot" />`;
+
+            // If inverted, add NOT bubble/gate
+            if (lit.inverted) {
+                const notX = gateX - config.notSize - 5;
+                // Wire up to NOT
+                svg += `<line x1="${railX}" y1="${connectionY}" x2="${notX}" y2="${connectionY}" class="circuit-wire" />`;
+                // Draw Triangle
+                svg += `<path d="M ${notX},${connectionY-6} L ${notX+10},${connectionY} L ${notX},${connectionY+6} Z" class="circuit-gate-body circuit-gate-fill" />`;
+                // Draw Bubble
+                svg += `<circle cx="${notX+12}" cy="${connectionY}" r="2.5" class="circuit-gate-body circuit-gate-fill" />`;
+                // Short wire from bubble to gate
+                svg += `<line x1="${notX+15}" y1="${connectionY}" x2="${gateX}" y2="${connectionY}" class="circuit-wire" />`;
+            } else {
+                // Direct wire
+                svg += `<line x1="${railX}" y1="${connectionY}" x2="${gateX}" y2="${connectionY}" class="circuit-wire" />`;
+            }
+        });
+
+        // Draw AND Gate Shape
+        if (literals.length === 1) {
+            // Special case: Single literal term is just a wire buffer (logic-wise), 
+            // but for visualization consistency we draw a buffer or wire.
+            // If it's a single literal like "A", standard SOP drawing typically just passes it to OR.
+            // But we will draw a buffer-like box or pass-through to keep grid consistent.
+            // Actually, "A" in SOP is A AND 1, so an AND gate with 1 input is valid visually as a buffer.
+            svg += drawAndShape(gateX, gateY, config.gateWidth, config.gateHeight);
+        } else {
+            svg += drawAndShape(gateX, gateY, config.gateWidth, config.gateHeight);
+        }
+
+        andGateOutputCoords.push({ x: andGateOutputX, y: gateCenterY });
+    });
+
+    // 3. Draw OR Gate (Sum)
+    if (parsedTerms.length > 1) {
+        const orGateX = andGateOutputX + 40; // Spacing between stages
+        // Center OR gate vertically relative to all AND gates
+        const totalHeight = (parsedTerms.length * config.gridY);
+        const orGateY = startY + (totalHeight - config.gateHeight) / 2;
+        const orGateCenterY = orGateY + config.gateHeight / 2;
+
+        // Draw connections from AND outputs to OR inputs
+        andGateOutputCoords.forEach((coord, i) => {
+            // Calculate target Y on OR gate curve
+            // We'll distribute them evenly on the back of the OR gate
+            const inputOffset = (config.gateHeight / (andGateOutputCoords.length + 1)) * (i + 1);
+            const targetY = orGateY + inputOffset;
+            const targetX = orGateX + 5; // Curve inset
+
+            // Draw Orthogonal paths
+            svg += `<path d="M ${coord.x},${coord.y} H ${orGateX - 20} V ${targetY} H ${targetX}" class="circuit-wire" fill="none" />`;
+        });
+
+        // Draw OR Gate
+        svg += drawOrShape(orGateX, orGateY, config.gateWidth, config.gateHeight);
+
+        // Final Output Wire
+        svg += `<line x1="${orGateX + config.gateWidth}" y1="${orGateCenterY}" x2="${width - 10}" y2="${orGateCenterY}" class="circuit-wire" />`;
+        svg += `<text x="${width - 10}" y="${orGateCenterY - 10}" class="circuit-text">F</text>`;
+
+    } else if (parsedTerms.length === 1) {
+        // Just one term, extend output wire directly
+        const coord = andGateOutputCoords[0];
+        svg += `<line x1="${coord.x}" y1="${coord.y}" x2="${width - 20}" y2="${coord.y}" class="circuit-wire" />`;
+        svg += `<text x="${width - 10}" y="${coord.y - 10}" class="circuit-text">F</text>`;
+    }
+
+    svg += '</svg>';
+    container.innerHTML = svg;
+}
+
+// --- Helper Functions for Shapes ---
+
+function drawAndShape(x, y, w, h) {
+    // Standard D shape
+    return `<path d="M ${x},${y} L ${x + w/2},${y} A ${h/2},${h/2} 0 0 1 ${x + w/2},${y + h} L ${x},${y + h} Z" class="circuit-gate-body circuit-gate-fill" />`;
+}
+
+function drawOrShape(x, y, w, h) {
+    // Curved back, pointed front
+    // Using Quadratic Bezier curves
+    return `<path d="M ${x},${y} 
+            Q ${x + w/2},${y} ${x + w},${y + h/2} 
+            Q ${x + w/2},${y + h} ${x},${y + h} 
+            Q ${x + w/4},${y + h/2} ${x},${y} Z" 
+            class="circuit-gate-body circuit-gate-fill" />`;
+}
 
 console.log('🔹 Digital Logic Simplifier loaded successfully!');

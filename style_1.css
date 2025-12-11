@@ -568,3 +568,62 @@ button:active {
         color: #e0e0e0;
     }
 }
+
+/* ... existing styles ... */
+
+/* Logic Circuit Diagram Styles */
+.circuit-container {
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+    border: 1px solid #e0e0e0;
+    overflow-x: auto;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 200px;
+}
+
+svg.logic-circuit {
+    display: block;
+    margin: 0 auto;
+}
+
+/* SVG Elements Styling */
+.circuit-wire {
+    stroke: #333;
+    stroke-width: 2;
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.circuit-gate-body {
+    stroke: #333;
+    stroke-width: 2;
+    fill: #ffffff;
+}
+
+.circuit-gate-fill {
+    fill: #f8f9ff; /* Subtle tint for gates */
+}
+
+.circuit-dot {
+    fill: #333;
+}
+
+.circuit-text {
+    font-family: 'Fira Code', monospace;
+    font-size: 14px;
+    fill: #333;
+    font-weight: bold;
+    text-anchor: middle;
+    dominant-baseline: middle;
+}
+
+.circuit-label {
+    font-family: 'Segoe UI', sans-serif;
+    font-size: 12px;
+    fill: #666;
+}
