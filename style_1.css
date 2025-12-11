@@ -1,4 +1,35 @@
 /* Digital Logic Simplifier - Main Stylesheet */
+/* --- Responsive base variables & small-reset (insert right after the * { ... } rule) --- */
+:root{
+  --container-max: 1400px;
+  --container-padding: 20px;
+  --gutter: 1rem;
+  --font-base: 16px;
+}
+/* allow normal page behavior but prefer local scroll areas for wide content */
+html, body {
+    overflow-x: visible;
+}
+/* allow grid / flex children to shrink instead of forcing overflow */
+.section, .team-member, .code-block, .table-responsive, .circuit-container {
+    min-width: 0; /* important for grid/flex children so they don't force container width */
+}
+
+/* also for main content columns */
+.main-content > * {
+    min-width: 0;
+}
+
+/* make sure inner scrollable areas still work */
+.table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.circuit-container { overflow-x: auto; } /* already exists but reinforce it */
+
+/* make images, svg and videos fluid by default */
+img, picture, video, svg {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
 
 * {
     margin: 0;
@@ -14,13 +45,39 @@ body {
     padding: 20px;
 }
 
+/* ---------------------------
+   Select / dropdown rescue
+   --------------------------- */
+/* Ensure native dropdowns render above other UI and are not clipped */
+select, .output-select {
+  position: relative;        /* allow z-index to take effect */
+  z-index: 99999;            /* high so it shows above overlays */
+  -webkit-appearance: menulist-button;
+  appearance: menulist-button;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* On small screens, make them stretch but keep dropdown visible */
+@media (max-width: 768px) {
+  .controls select, .controls .output-select {
+    width: 100%;
+    min-width: 0;            /* important so flex children don't force overflow */
+  }
+}
+
 .container {
-    max-width: 1400px;
+    width: 100%;
+    max-width: calc(100% - (var(--container-padding, 20px) * 2));
     margin: 0 auto;
     background: rgba(255, 255, 255, 0.95);
     border-radius: 20px;
     box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-    overflow: hidden;
+    overflow: visible;
+    padding-left: calc(var(--container-padding, 20px));
+    padding-right: calc(var(--container-padding, 20px));
+    box-sizing: border-box;
+    position: relative;
 }
 
 /* Header Styles */
@@ -42,23 +99,52 @@ body {
     opacity: 0.9;
 }
 
-/* Main Content Layout */
+/* MAIN CONTENT: give left column more weight on medium+ screens */
 .main-content {
     padding: 30px;
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1.8fr) minmax(0, 1fr); /* left column wider */
     gap: 30px;
 }
 
+/* Slightly different layout for very wide screens (desktop) */
+@media (min-width: 1400px) {
+    .main-content {
+        grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+        gap: 36px;
+    }
+}
+
+/* Tablet: keep two columns but allow them to shrink; not stacked yet */
+@media (min-width: 769px) and (max-width: 1024px) {
+    .main-content {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 22px;
+    }
+}
+
+/* Mobile: stack vertically */
+@media (max-width: 768px) {
+    .main-content {
+        grid-template-columns: 1fr;  /* stack only on small screens */
+        gap: 18px;
+        padding: 15px;
+    }
+}
+
+/* section box — no global overflow, keep hover animation but avoid creating new stacking context */
 .section {
     background: white;
     padding: 25px;
     border-radius: 15px;
     box-shadow: 0 10px 30px rgba(0,0,0,0.1);
     border: 1px solid #e0e0e0;
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+    will-change: transform;    /* hint but does not create stacking context */
+    /* IMPORTANT: do NOT set overflow: hidden here — allows dropdowns to show */
+    overflow: visible;
+    min-width: 0;              /* lets grid/flex children shrink safely */
 }
-
 .section:hover {
     transform: translateY(-5px);
     box-shadow: 0 15px 35px rgba(0,0,0,0.15);
@@ -136,20 +222,38 @@ button:active {
 }
 
 /* Table Styles */
+/* TABLES: keep full-width on desktop, allow horizontal scroll on small screens */
 .truth-table, .kmap-table {
     width: 100%;
     border-collapse: collapse;
     margin: 15px 0;
     background: white;
     border-radius: 10px;
-    overflow: hidden;
+    overflow: visible; /* allow normal layout on desktop */
     box-shadow: 0 5px 15px rgba(0,0,0,0.1);
 }
 
+/* local horizontal scrolling for wide elements (responsive safe) */
+.table-responsive, .circuit-container {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    box-sizing: border-box;
+    -ms-overflow-style: -ms-autohiding-scrollbar;
+}
+
+/* For tables, ensure inner table can be wider but container will scroll */
+.table-responsive > table {
+    width: 100%;
+    min-width: 600px; /* allows table to breathe — adjust as needed */
+}
+
+/* keep cell defaults (existing) */
 .truth-table th, .truth-table td, .kmap-table th, .kmap-table td {
     padding: 12px 15px;
     text-align: center;
     border: 1px solid #ddd;
+    white-space: nowrap;
 }
 
 .truth-table th, .kmap-table th {
@@ -171,14 +275,20 @@ button:active {
 }
 
 /* K-Map Styles */
+/* K-MAP CELLS — fluid, responsive sizing */
 .kmap-cell {
-    width: 60px;
-    height: 60px;
+    width: clamp(40px, 8vw, 60px);
+    height: clamp(40px, 8vw, 60px);
     position: relative;
     background: #f8f9ff;
     transition: all 0.3s ease;
     font-weight: bold;
-    font-size: 18px;
+    font-size: clamp(14px, 2vw, 18px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 40px;
+    min-height: 40px;
 }
 
 .kmap-cell.one {
@@ -205,6 +315,12 @@ button:active {
 .kmap-cell:hover {
     transform: scale(1.1);
     z-index: 10;
+}
+/* protect against long words/IDs that can push layout horizontally */
+.team-member, .team-member * {
+    box-sizing: border-box;
+    word-break: break-word;
+    overflow-wrap: anywhere;
 }
 
 /* Output Select */
@@ -246,6 +362,20 @@ button:active {
     background: white;
     border-radius: 8px;
     box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.label-white {
+    color: #fff !important;
+}
+/* Pure black text on white K-map / truth table cells */
+.truth-table td,
+.kmap-table td {
+    color: #000 !important;
+}
+.kmap-cell.one,
+.kmap-cell.zero,
+.kmap-cell.dont-care {
+    color: #fff !important;
 }
 
 /* Code Block Styles */
@@ -354,7 +484,7 @@ button:active {
 
 .loading::after {
     content: '';
-    position: absolute;
+    position: relative;
     top: 50%;
     left: 50%;
     width: 30px;
@@ -389,6 +519,19 @@ button:active {
 }
 
 /* Responsive Design */
+/* Tablet breakpoint (improves layout for tablets & landscape phones) */
+@media (min-width: 769px) and (max-width: 1024px) {
+    :root { --container-padding: 18px; }
+    .container { max-width: 1000px; margin: 12px auto; padding: var(--container-padding); }
+    .main-content {
+        grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); /* 1 or 2 columns depending on width */
+        gap: 22px;
+    }
+    .header h1 { font-size: 2.1em; }
+    .team-grid { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+    .kmap-cell { font-size: clamp(13px,1.6vw,17px); }
+}
+
 @media (max-width: 1200px) {
     .container {
         margin: 10px;
@@ -431,6 +574,56 @@ button:active {
     .copy-btn, .download-btn {
         width: 100%;
         text-align: center;
+    }
+
+    /* On small screens keep code readable by enabling horizontal scrolling */
+    .code-block {
+        white-space: pre;         /* preserve formatting and allow horizontal scroll */
+        overflow-x: auto;        /* horizontal scroll for long lines */
+        word-break: normal;
+        min-width: 0;
+    }
+    .circuit-container {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        min-width: 0;
+    }
+    /* make controls easier to tap on phones */
+    select, button, .output-select {
+        min-height: 44px;
+        font-size: 1rem;
+    }
+}
+/* Contributors: force single-column stack on phones */
+@media (max-width: 768px) {
+    .team-grid {
+        grid-template-columns: 1fr !important; /* single column */
+        max-width: 100%;
+        gap: 12px;
+    }
+
+    .team-member {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+        padding: 12px;
+    }
+    .team-grid {
+        grid-template-columns: 1fr !important; /* single column */
+        gap: 12px;
+        width: 100%;
+    }
+    .team-member {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+        width: 100%;
+    }
+    .team-member .id {
+        width: auto;
+        overflow-wrap: anywhere;
     }
 }
 
@@ -587,7 +780,17 @@ button:active {
 
 svg.logic-circuit {
     display: block;
-    margin: 0 auto;
+    width: 100%;
+    height: auto;
+    max-width: 100%;
+    /* ensure it cannot force the page wider than viewport */
+    max-width: calc(100vw - (var(--container-padding, 20px) * 2));
+}
+
+/* Safety: treat internal SVG drawing coordinates as box content (prevents accidental overflow) */
+svg.logic-circuit * {
+    vector-effect: non-scaling-stroke; /* optional but helps stroke scaling */
+    box-sizing: border-box;
 }
 
 /* SVG Elements Styling */
@@ -724,4 +927,64 @@ svg.logic-circuit {
         align-items: flex-start;
         gap: 5px;
     }
+}
+/* defensive: avoid text pushing layout */
+* { word-break: break-word; overflow-wrap: anywhere; }
+
+/* keep long code lines safe but allow horizontal scroll */
+.code-block { white-space: pre; overflow-x: auto; min-width: 0; }
+
+/* ---------- Responsive compact selects (override earlier rules) ---------- */
+select, .output-select {
+  width: 100%;
+  max-width: 160px;                    /* prevents huge selects on wide screens */
+  min-width: 80px;
+  padding: 6px 8px;
+  font-size: clamp(12px, 2.4vw, 14px); /* responsive font */
+  line-height: 1.2;
+  color: #000;                          /* pure black text on white bg */
+  background: #fff;
+  border: 1px solid #bbb;
+  border-radius: 6px;
+  box-sizing: border-box;
+  -webkit-appearance: menulist-button;
+  appearance: menulist-button;
+  position: relative;
+  z-index: 9999;                        /* ensure it sits above overlays */
+  overflow: hidden;                     /* prefer internal clipping rather than huge popup */
+}
+
+/* Some browsers will honor option styling — include safe defaults */
+select option, .output-select option {
+  font-size: inherit;
+  line-height: 1.3;
+  padding: 4px 8px;
+  color: #000 !important;
+  background: #fff !important;
+  white-space: nowrap;                  /* prefer single-line options where possible */
+  max-width: 100vw;                     /* best-effort: option list won't exceed viewport */
+}
+
+/* Make select smaller on very small screens */
+@media (max-width: 600px) {
+  select, .output-select {
+    max-width: 140px;
+    font-size: 13px;
+    padding: 5px 7px;
+  }
+}
+
+/* Ensure controls don't force overflow */
+.controls select, .controls .output-select {
+  min-width: 0; /* lets flex children shrink properly */
+}
+
+/* In dark-mode switch text/background for selects */
+@media (prefers-color-scheme: dark) {
+  select, .output-select,
+  select option, .output-select option {
+    background-color: #222 !important;
+    color: #fff !important;
+    border-color: #444 !important;
+  }
 }

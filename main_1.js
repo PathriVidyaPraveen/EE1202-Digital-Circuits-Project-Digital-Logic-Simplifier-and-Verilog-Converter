@@ -66,8 +66,8 @@ function generateTruthTable() {
     }
 
     html += '</tbody></table>';
-    document.getElementById('truth-table-container').innerHTML = html;
-    
+    document.getElementById('truth-table-container').innerHTML = '<div class="table-responsive">' + html + '</div>';
+
     // Update all dependent sections
     updateAll();
 }
@@ -167,7 +167,7 @@ function generateKMap() {
         html = '<div class="error">Error generating K-Map</div>';
     }
 
-    document.getElementById('kmap-container').innerHTML = html;
+    document.getElementById('kmap-container').innerHTML = '<div class="table-responsive">' + html + '</div>';
 }
 
 /**
@@ -1071,8 +1071,8 @@ function drawLogicDiagram(terms) {
     const height = Math.max(numAndGates * config.gridY, numInputs * 50) + config.padding * 2;
     
     // Create SVG
-    let svg = `<svg class="logic-circuit" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">`;
-    
+    let svg = `<svg class="logic-circuit" viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">`;
+
     // Define Arrow Marker for lines
     svg += `<defs>
         <marker id="dot" markerWidth="6" markerHeight="6" refX="3" refY="3">
